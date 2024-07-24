@@ -59,7 +59,6 @@ int main(int argc, char *argv[]) {
             exit(estado);
         }
     }
-
     /* Esperar a que terminen todos los hilos */
     for (i = 0; i < num_lectores; i++) {
         pthread_join(lectora[i], NULL);
