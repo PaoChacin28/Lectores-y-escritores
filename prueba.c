@@ -2,158 +2,154 @@
 #include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
-/*Variables Globales*/
+/* Variables Globales */
+typedef struct datos {
+    char nombre[20];
+    char apellido[20];
+    int edad;
+} Datos;
 
-	int rc=0;
+unsigned int num_escritores, num_lectores;
+FILE *baseDatos;
+sem_t mutex, db;
+int rc = 0;
 
-	typedef struct datos{
-		char nombre[20];
-		char apellido[20];
-		int edad;
-	}Datos;
+/* Prototipos de Funciones */
+void *lector(void *p);
+void *escritor(void *p);
+void escribirenbasedatos();
+void leerenbasedatos();
+void inicializar_semaforos();
+void destruir_semaforos();
+void abrir_base_datos();
 
-	unsigned int num_escritores, num_lectores;
-	FILE * baseDatos;
+int main() {
+    printf("Ingrese el número de escritores: ");
+    scanf("%u", &num_escritores);
+    printf("Ingrese el número de lectores: ");
+    scanf("%u", &num_lectores);
 
-/*Semaforos*/
+    int eid[num_escritores], lid[num_lectores];
+    pthread_t escritora[num_escritores], lectora[num_lectores];
 
-	sem_t mutex,db;
+    abrir_base_datos();
+    inicializar_semaforos();
 
-/*Funciones*/
-
-	void *lector(void *p);
-	void *escritor(void *p);
-	void escribirenbasedatos();
-	void leerenbasedatos();
-
-int main(int argc, char *argv[]){
-
-	int estado,i;
-	extern FILE * baseDatos;
-	baseDatos=fopen("baseDatos.txt","w");
-	fclose(baseDatos);
-
-	 if ( argc < 3 ) {
-                printf("Numero de parametros incorrecto. Indicar el numero de datos a producir.\n") ;
-                exit(1);              
+    for (unsigned int i = 0; i < num_lectores; i++) {
+        lid[i] = i;
+        if (pthread_create(&lectora[i], NULL, lector, (void *)&lid[i]) != 0) {
+            perror("Error al crear hilo lector");
+            exit(EXIT_FAILURE);
         }
-	
-	num_escritores = atoi(argv[1]);
-	num_lectores = atoi(argv[2]);
+    }
 
-	int eid[num_escritores],lid[num_lectores];
+    for (unsigned int i = 0; i < num_escritores; i++) {
+        eid[i] = i;
+        if (pthread_create(&escritora[i], NULL, escritor, (void *)&eid[i]) != 0) {
+            perror("Error al crear hilo escritor");
+            exit(EXIT_FAILURE);
+        }
+    }
 
-	/*Declaración de las dos hebras*/
+    for (unsigned int i = 0; i < num_lectores; i++) {
+        pthread_join(lectora[i], NULL);
+    }
+    for (unsigned int i = 0; i < num_escritores; i++) {
+        pthread_join(escritora[i], NULL);
+    }
 
-	pthread_t escritora[num_escritores],lectora[num_lectores];
-
-	/*Inicialización de Semáforos*/
-
-	sem_init(&mutex,0,1);
-	sem_init(&db,0,1);
-
-	for(i=0;i<num_lectores;i++){
-		lid[i]=i;
-		if((estado=pthread_create(&lectora[i],NULL,lector,(void *) &lid[i])))
-			exit(estado);
-	}
-
-	for(i=0;i<num_escritores;i++){
-		eid[i]=i;
-		if((estado=pthread_create(&escritora[i],NULL,escritor,(void *) &eid[i])))
-			exit(estado);
-	}
-
-	/*La hebra principal esperara a que terminen las otras 2 hebras.*/
-
-	for(i=0;i<num_lectores;i++)
-	{
-		pthread_join(lectora[i],NULL);
-	}
-	for(i=0;i<num_escritores;i++)
-	{
-		pthread_join(escritora[i],NULL);
-	}
-	/*Destrucción de los semaforos*/
-
-	sem_destroy(&mutex);
-	sem_destroy(&db);
-
-	return 0;
-}
-void escribirenbasedatos(){
-
-	extern FILE *baseDatos;
-	char c;
-	baseDatos=fopen("baseDatos.txt","a+");
-
-	while ((c=getc(stdin))!=EOF){
-		fputc(c,baseDatos);
-	}
-	fclose(baseDatos);	
-
-}
-void leerenbasedatos(){
-	
-	extern FILE *baseDatos;
-	Datos p;        
-	baseDatos=fopen("baseDatos.txt","r");
-
-	while (fscanf(baseDatos,"%s\n%s\n%d\n",p.nombre,p.apellido,&p.edad)==3){
-
-		printf("\nNombre:");
-		puts(p.nombre);
-		printf("Apellidos:");
-		puts(p.apellido);
-		printf("Edad:\n");
-		printf("%d",p.edad);
-	}
-
-	fclose(baseDatos);
-
+    destruir_semaforos();
+    return 0;
 }
 
-
-void *escritor(void *p){
-
-		extern sem_t mutex,db;
-		int *id_es;
-        	id_es=(int *)p;
-
-		/*Sección Residual*/
-
-		sem_wait(&db);
-		printf("\nEscritor %d Escribiendo...\n",*id_es);
-		escribirenbasedatos();
-		sem_post(&db);
-		pthread_exit(NULL);
-
+void abrir_base_datos() {
+    baseDatos = fopen("baseDatos.txt", "a+");
+    if (baseDatos == NULL) {
+        perror("Error al abrir la base de datos");
+        exit(EXIT_FAILURE);
+    }
+    fclose(baseDatos);
 }
 
-void *lector(void *p){
+void inicializar_semaforos() {
+    sem_init(&mutex, 0, 1);
+    sem_init(&db, 0, 1);
+}
 
-		extern sem_t mutex,db;
-		extern int rc;
-		int *id_le;
+void destruir_semaforos() {
+    sem_destroy(&mutex);
+    sem_destroy(&db);
+}
 
-        	id_le=(int *)p;
-		
-		sem_wait(&mutex);
-		rc++;
-		if(rc == 1)
-		   sem_wait(&db);
+void escribirenbasedatos() {
+    Datos p;
+    printf("Introduce el nombre: ");
+    scanf("%19s", p.nombre);
+    printf("Introduce el apellido: ");
+    scanf("%19s", p.apellido);
+    printf("Introduce la edad: ");
+    scanf("%d", &p.edad);
 
-		
-		printf("\nLector %d Leyendo...\n",*id_le);
-		leerenbasedatos();
-		sem_post(&mutex);
-		sem_wait(&mutex);
-		rc--;
+    baseDatos = fopen("baseDatos.txt", "a");
+    if (baseDatos == NULL) {
+        perror("Error al abrir la base de datos para escritura");
+        return;
+    }
 
-		if(rc == 0)
-		  sem_post(&db);
+    fprintf(baseDatos, "%s\n%s\n%d\n", p.nombre, p.apellido, p.edad);
+    fclose(baseDatos);
+}
 
-		sem_post(&mutex);
-		pthread_exit(NULL);
+void leerenbasedatos() {
+    Datos p;
+    baseDatos = fopen("baseDatos.txt", "r");
+    if (baseDatos == NULL) {
+        perror("Error al abrir la base de datos para lectura");
+        return;
+    }
+
+    while (fscanf(baseDatos, "%19s %19s %d", p.nombre, p.apellido, &p.edad) == 3) {
+        printf("\nNombre: %s\nApellido: %s\nEdad: %d\n", p.nombre, p.apellido, p.edad);
+    }
+
+    fclose(baseDatos);
+}
+
+void *escritor(void *p) {
+    int *id_es = (int *)p;
+    while (1) {
+        sleep(rand() % 5 + 1); // Simula tiempo de espera entre escrituras
+        sem_wait(&db);
+        printf("\nEscritor %d Escribiendo...\n", *id_es);
+        escribirenbasedatos();
+        printf("Escritor %d ha terminado de escribir.\n", *id_es);
+        sem_post(&db);
+    }
+    pthread_exit(NULL);
+}
+
+void *lector(void *p) {
+    int *id_le = (int *)p;
+    while (1) {
+        sleep(rand() % 5 + 1); // Simula tiempo de espera entre lecturas
+        printf("\nLector %d solicitando leer...\n", *id_le);
+        sem_wait(&mutex);
+        rc++;
+        if (rc == 1)
+            sem_wait(&db); // Bloquear escritura mientras haya lectores
+        sem_post(&mutex);
+
+        printf("\nLector %d Leyendo...\n", *id_le);
+        leerenbasedatos();
+
+        sem_wait(&mutex);
+        rc--;
+        if (rc == 0)
+            sem_post(&db); // Permitir escritura si no hay lectores
+        sem_post(&mutex);
+    }
+    pthread_exit(NULL);
 }
