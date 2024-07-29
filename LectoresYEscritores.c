@@ -4,8 +4,8 @@
 #include <semaphore.h>
 #include <unistd.h>
 
-#define NUM_READERS 3
-#define NUM_WRITERS 2
+#define NUM_READERS 2
+#define NUM_WRITERS 4
 #define NUM_OPERATIONS 5
 
 sem_t rw_mutex;
@@ -16,7 +16,7 @@ int total_operations = 0;
 void* reader(void* arg) {
     int reader_id = *((int*)arg);
     while (1) {
-        printf("[Reader-%d] Requesting to read\n", reader_id);
+        printf("[Lector-%d] Ha solicitado leer\n", reader_id);
 
         sem_wait(&mutex);
         read_count++;
@@ -25,9 +25,9 @@ void* reader(void* arg) {
         }
         sem_post(&mutex);
 
-        printf("[Reader-%d] Reading...\n", reader_id);
+        printf("[Lector-%d] Leyendo...\n", reader_id);
         sleep(rand() % 3 + 1); // Simulación de tiempo de lectura
-        printf("[Reader-%d] Finished reading\n", reader_id);
+        printf("[Lector-%d] Ha terminado de leer\n", reader_id);
 
         sem_wait(&mutex);
         read_count--;
@@ -52,12 +52,12 @@ void* reader(void* arg) {
 void* writer(void* arg) {
     int writer_id = *((int*)arg);
     while (1) {
-        printf("[Writer-%d] Requesting to write\n", writer_id);
+        printf("[Escritor-%d] Ha solicitado escribir\n", writer_id);
 
         sem_wait(&rw_mutex);
-        printf("[Writer-%d] Writing...\n", writer_id);
+        printf("[Escritor-%d] Escribiendo...\n", writer_id);
         sleep(rand() % 3 + 1); // Simulación de tiempo de escritura
-        printf("[Writer-%d] Finished writing\n", writer_id);
+        printf("[Escritor-%d] Ha terminado de escribir\n", writer_id);
         sem_post(&rw_mutex);
 
         sem_wait(&mutex);
