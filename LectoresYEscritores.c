@@ -3,7 +3,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <unistd.h>
-
+//hola alex 
 #define NUM_READERS 2
 #define NUM_WRITERS 4
 #define NUM_OPERATIONS 5
